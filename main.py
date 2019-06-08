@@ -6,6 +6,7 @@ import tkinter as tk
 import tkinter.messagebox
 import tkinter.filedialog
 import tkinter.ttk
+import hashlib
 from fuzzywuzzy import fuzz
 
 #需要描述的对象就是页面
@@ -86,10 +87,10 @@ class ListPage():
                 self.OutputText.delete(child)
 
             for subdir in subdirs:
-                self.OutputText.insert('', 0, values=(maindir + '/' + subdir, subdir, '子目录'))
+                self.OutputText.insert('', 'end', values=(maindir + '/' + subdir, subdir, '子目录'))
 
             for file in files:
-                self.OutputText.insert('', 0, values=(maindir + '/' + file, file, '文件'))
+                self.OutputText.insert('', 'end', values=(maindir + '/' + file, file, '文件'))
 
         self.ConfirmButton = tk.Button(self.SelectFrame, font=('Arial', 15), text='确认', command = confirm)
         self.ConfirmButton.pack(side=tk.LEFT)
@@ -130,7 +131,7 @@ class SearchPage():
             for MainDir, SubDir, FileNameList in os.walk(inputdir):
                 for file in FileNameList:
                     if (fuzz.ratio(filename, file) == 100):
-                        self.OutputText.insert('', 0, text=MainDir  + file, values=(file, MainDir + '/' + file))
+                        self.OutputText.insert('', 'end', text=MainDir  + file, values=(file, MainDir + '/' + file))
                         havefind = True
             if(havefind == False):
                 tkinter.messagebox.showwarning(title='错误', message='未找到该文件')
@@ -140,7 +141,7 @@ class SearchPage():
             for MainDir, SubDir, FileNameList in os.walk(inputdir):
                 for file in FileNameList:
                     if (fuzz.partial_ratio(filename, file)  >= 90):
-                        self.OutputText.insert('', 0, text=MainDir + file, values=(file, MainDir + '/' + file))
+                        self.OutputText.insert('', 'end', text=MainDir + file, values=(file, MainDir + '/' + file))
                         havefind = True
             if (havefind == False):
                 tkinter.messagebox.showwarning(title='错误', message='未找到类似文件')
@@ -226,16 +227,92 @@ class Md5Page():
         self.page.geometry('%dx%d+%d+%d' % (1920, 1080, x, y))
         self.page.title(title)
 
-
     def ret(self):
         self.page.destroy()
         mp = MainPage.mainpage(self)
         mp.create()
 
+    def reset(self):
+        self.FileEntry.delete(0, 'end')
+        self.DirEntry.delete(0, 'end')
+        self.FileEntry.config(state='normal')
+        self.FileConfirm.config(state='normal')
+        self.DirEntry.config(state='normal')
+        self.DirConfirm.config(state='normal')
+
+    def dir_overwatch(self):
+        self.FileEntry.delete(0, 'end')
+        self.FileEntry.config(state = 'readonly')
+        self.FileConfirm.config(state = 'disable')
+
+    def file_overwatch(self):
+        self.DirEntry.delete(0, 'end')
+        self.DirEntry.config(state='readonly')
+        self.DirConfirm.config(state = 'disable')
+
+    def getmd5(self, file_addr):
+        with open(file_addr, "rb") as f:
+            md5 = hashlib.md5()
+            md5.update(f.read())
+            hash = md5.hexdigest()
+            return hash
+
+    def file_select(self):
+        self.FileEntry.config(state = 'normal')
+        self.FileConfirm.config(state = 'normal')
+        self.file_overwatch()
+        self.FileEntry.delete(0, 'end')
+        for child in self.OutputText.get_children():
+            self.OutputText.delete(child)
+
+        DefaultDir = '/home/danny'
+        SelectedFiles = tk.filedialog.askopenfilenames(initialdir=DefaultDir, title="选择文件", filetypes=(("all files", "*.*"), ("all files", "*.*")))
+        for SelectedFile in SelectedFiles:
+            self.FileEntry.insert(0, SelectedFile + ' ')
+        return SelectedFiles
+
+    def file_output(self):
+        self.file_overwatch()
+
+        for child in self.OutputText.get_children():
+            self.OutputText.delete(child)
+
+        files_addr = self.FileEntry.get()
+        if(not files_addr):
+            tkinter.messagebox.showwarning(title = '警告', message = '请选择文件')
+            self.DirEntry.config(state='normal')
+            self.DirConfirm.config(state='normal')
+            return
+
+        empty = ' '
+        while(files_addr):
+            file_addr = files_addr[0:files_addr.find(empty)]
+            files_addr = files_addr[files_addr.find(empty)+1:]
+            file = os.path.basename(file_addr)
+            self.OutputText.insert('', 'end', values=(file, self.getmd5(file_addr), file_addr))
+
+    def dir_select(self):
+        self.DirEntry.config(state='normal')
+        self.DirConfirm.config(state='normal')
+        self.dir_overwatch()
+        self.DirEntry.delete(0, 'end')
+        DefaultDir = '/home/danny/'
+        options = {}
+        options['parent'] = self.page
+        SelectedDir = tk.filedialog.askdirectory(title='选择路径', initialdir=(os.path.expanduser(DefaultDir)), **options)
+        self.DirEntry.insert(0, SelectedDir)
+
     def dir_output(self):
+        self.dir_overwatch()
+
+        for child in self.OutputText.get_children():
+            self.OutputText.delete(child)
+
         dirname = self.DirEntry.get()
         if(dirname == ''):
             tkinter.messagebox.showwarning(title='错误', message='请输入或选择路径')
+            self.FileEntry.config(state='normal')
+            self.FileConfirm.config(state='normal')
             return
         if (os.path.exists(dirname) == False):
             tkinter.messagebox.showwarning(title='错误', message='路径不存在')
@@ -246,51 +323,94 @@ class Md5Page():
                 return MainDir, SubDir, FileNameList
 
         maindir, subdirs, files = walk(dirname)
+
+        for file in files:
+            file_addr = maindir + '/' + file
+            self.OutputText.insert('', 'end', values=(file, self.getmd5(file_addr), maindir + '/' + file))
+
+    def text_save(self):
+        f = tkinter.filedialog.asksaveasfile(title = '选择保存路径', mode='w', filetypes=(("text files", "*.txt"), ("all files", "*.*")))
+        if f is None:
+            return
+
+        for line in self.OutputText.get_children():
+            res = ''
+            for info in self.OutputText.item(line)['values']:
+                res = res + str(info) + ' '
+            res.rstrip()
+            f.write(res + '\n')
+
+        f.close()
+
+    def create(self):
+        self.MenuBar = tk.Menu(self.page)
+        self.OptionMenu = tk.Menu(self.MenuBar, tearoff = 0)
+        self.MenuBar.add_cascade(label = '选项', font = ('Arial', 15), menu = self.OptionMenu)
+        self.OptionMenu.add_command(label = '保存', font = ('Arial', 15), command = self.text_save)
+        self.OptionMenu.add_command(label = '退出', font = ('Arial', 15), command = self.page.quit)
+        self.page.config(menu = self.MenuBar)
+
+        self.OptionFrame = tk.Frame(self.page)
+        self.OptionFrame.pack(side = tk.TOP, fill ='x')
+        self.DirSelectFrame = tk.Frame(self.OptionFrame)
         self.DirSelectFrame.pack(side = tk.TOP, fill = 'x')
+        self.ReturnButton = tk.Button(self.DirSelectFrame, font = ('Arial', 15), text ='返回', command = self.ret)
+        self.ReturnButton.pack(side = tk.LEFT, fill ='x')
+        self.DirSelectLabel = tk.Label(self.DirSelectFrame, font = ('Arial', 15), text = '输入或选择路径')
+        self.DirSelectLabel.pack(side = tk.LEFT, fill = 'x')
+        self.DirEntry = tk.Entry(self.DirSelectFrame, show = None, font = ('Arial', 15))
+        self.DirEntry.pack(side = tk.LEFT, expand = 'yes', fill = 'x')
+        self.DirSelectButton = tk.Button(self.DirSelectFrame, font=('Arial', 15), text='选择', command = self.dir_select)
+        self.DirSelectButton.pack(side=tk.LEFT, fill ='x')
+        self.DirConfirm = tk.Button(self.DirSelectFrame, font=('Arial', 15), text='确认', command=self.dir_output)
+        self.DirConfirm.pack(side=tk.LEFT, fill ='x')
+
+        self.FileSelectFrame = tk.Frame(self.OptionFrame)
         self.FileSelectFrame.pack(side = tk.TOP, fill = 'x')
-        '''self.OutputFrame = tk.Frame(self.page)
+        self.ResetButton = tk.Button(self.FileSelectFrame, font = ('Arial', 15), text ='置零', command = self.reset)
+        self.ResetButton.pack(side = tk.LEFT, fill ='x')
+        self.FileSelectLabel = tk.Label(self.FileSelectFrame, font = ('Arial', 15), text = '输入或选择文件')
+        self.FileSelectLabel.pack(side = tk.LEFT, fill = 'x')
+        self.FileEntry = tk.Entry(self.FileSelectFrame, show = None, font = ('Arial', 15))
+        self.FileEntry.pack(side = tk.LEFT, expand = 'yes', fill = 'x')
+        self.FileSelectButton = tk.Button(self.FileSelectFrame, font=('Arial', 15), text='选择', command=self.file_select)
+        self.FileSelectButton.pack(side=tk.LEFT, fill='x')
+        self.FileConfirm = tk.Button(self.FileSelectFrame, font=('Arial', 15), text='确认', command=self.file_output)
+        self.FileConfirm.pack(side=tk.LEFT, fill='x')
+
+        self.OutputFrame = tk.Frame(self.page)
         self.OutputFrame.pack(expand='yes', fill='both')
         self.OutputText = tk.ttk.Treeview(self.OutputFrame)
         self.OutputText.pack(expand='yes', fill='both')
         self.OutputText['show'] = 'headings'
 
-        self.OutputText['columns'] = ('文件名', '路径')
+        self.OutputText['columns'] = ('文件名', 'Md5', '路径')
         self.OutputText.column('文件名', width=150)
+        self.OutputText.column('Md5', width=200)
         self.OutputText.column('路径', width=250)
         self.OutputText.heading('文件名', text='文件名')
-        self.OutputText.heading('路径', text='路径')'''
-
-
-    def create(self):
-        self.MeunFrame = tk.Frame(self.page)
-        self.MeunFrame.pack(side = tk.TOP, anchor = 'center', fill = 'x')
-
-        self.DirSelectFrame = tk.Frame(self.MeunFrame)
-        self.DirSelectFrame.pack(anchor = 'n')
-        self.DirSelectLabel = tk.Label(self.DirSelectFrame, font = ('Arial', 15), text = '选择整个目录')
-        self.DirSelectLabel.pack(side = tk.LEFT, fill = 'x')
-        self.DirEntry = tk.Entry(self.DirSelectFrame, show=None, font=('Arial', 15))
-        self.DirEntry.pack(side=tk.LEFT, fill='x', expand='yes')
-
-        def dir_select():
-            self.DirEntry.delete(0, 'end')
-            DefaultDir = '/home/danny/'
-            options = {}
-            options['parent'] = self.page
-            SelectedDir = tk.filedialog.askdirectory(title='选择文件', initialdir=(os.path.expanduser(DefaultDir)), **options)
-            self.DirEntry.insert(0, SelectedDir)
-
-        self.DirSelectButton = tk.Button(self.DirSelectFrame, font=('Arial', 15), text='选择', command=dir_select)
-        self.DirSelectButton.pack(side=tk.LEFT)
-        self.DirConfirmButton = tk.Button(self.DirSelectFrame, font=('Arial', 15), text='确认', command = self.dir_output)
-        self.DirConfirmButton.pack(side = tk.LEFT)
-
-        self.FileSelectFrame = tk.Frame(self.MeunFrame)
-        self.FileSelectFrame.pack(anchor = 's')
-        self.FileSelectLabel = tk.Label(self.FileSelectFrame, font = ('Arial', 15), text = '选择单个文件')
-        self.FileSelectLabel.pack(side = tk.LEFT, fill = 'x')
+        self.OutputText.heading('Md5', text='Md5')
+        self.OutputText.heading('路径', text='路径')
 
         self.page.mainloop()
+
+'''class ComparePage():
+    def __init__(self, title):
+        self.page = tk.Toplevel()
+        ws = self.page.winfo_screenwidth()
+        hs = self.page.winfo_screenheight()
+        x = (ws / 2) - (1920 / 2)
+        y = (hs / 2) - (1080 / 2)
+        self.page.geometry('%dx%d+%d+%d' % (1920, 1080, x, y))
+        self.page.title(title)
+
+    def ret(self):
+        self.page.destroy()
+        mp = MainPage.mainpage(self)
+        mp.create()'''
+
+
+
 
 class MainPage():
     def __init__(self, title):
