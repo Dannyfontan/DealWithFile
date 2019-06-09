@@ -493,8 +493,6 @@ class ComparePage():
             self.OutputText.delete(child)
 
     def delete(self):
-        for line in self.OutputText.get_children():
-             print(self.OutputText.item(line)['values'][1])
         child = self.OutputText.get_children()
         size = len(child)
         if(size > 0):
