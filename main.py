@@ -7,6 +7,7 @@ import tkinter.messagebox
 import tkinter.filedialog
 import tkinter.ttk
 import hashlib
+import time
 from fuzzywuzzy import fuzz
 
 #需要描述的对象就是页面
@@ -43,7 +44,7 @@ class ListPage():
 
         def dir_select():
             self.DirEntry.delete(0, 'end')
-            DefaultDir = '/home/danny/'
+            DefaultDir = 'C:\\'
             options = {}
             options['parent'] = self.page
             SelectedDir = tk.filedialog.askdirectory(title='选择文件', initialdir=(os.path.expanduser(DefaultDir)), **options)
@@ -70,14 +71,17 @@ class ListPage():
         self.OutputText.pack(expand='yes', fill='both')
         self.OutputText['show'] = 'headings'
 
-        self.OutputText['columns'] = ('路径', '名称', '类型')
-        self.OutputText.column('路径', width=250)
-        self.OutputText.column('名称', width=150)
-        self.OutputText.column('类型', width=100)
-
+        self.OutputText['columns'] = ('路径', '名称', '类型', '大小', '修改时间')
+        self.OutputText.column('路径', width=150)
+        self.OutputText.column('名称', width=50)
+        self.OutputText.column('类型', width=50)
+        self.OutputText.column('大小', width=50)
+        self.OutputText.column('修改时间', width=50)
         self.OutputText.heading('路径', text='路径')
         self.OutputText.heading('名称', text='名称')
         self.OutputText.heading('类型', text='类型')
+        self.OutputText.heading('大小', text='大小')
+        self.OutputText.heading('修改时间', text='修改时间')
 
         def confirm():
 
@@ -86,11 +90,40 @@ class ListPage():
             for child in self.OutputText.get_children():
                 self.OutputText.delete(child)
 
+            def formatSize(bytes):
+                try:
+                    bytes = float(bytes)
+                    kb = bytes / 1024
+                except:
+                    print("传入的字节格式不对")
+                    return "Error"
+
+                if kb >= 1024:
+                    M = round(kb / 1024, 3)
+                    if M >= 1024:
+                        G = round(M / 1024, 3)
+                        return "%.3fG" % (G)
+                    else:
+                        return "%.3fM" % (M)
+                else:
+                    kb = round(kb, 3)
+                    return "%.3fkb" % (kb)
+
+
+
             for subdir in subdirs:
-                self.OutputText.insert('', 'end', values=(maindir + '/' + subdir, subdir, '子目录'))
+                subdir_addr = maindir + '\\' + subdir
+                subdir_size = os.path.getsize(subdir_addr)
+                timestamp = os.path.getmtime(subdir_addr)
+                subdir_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(timestamp))
+                self.OutputText.insert('', 'end', values=(subdir_addr, subdir, '子目录', formatSize(subdir_size), subdir_time))
 
             for file in files:
-                self.OutputText.insert('', 'end', values=(maindir + '/' + file, file, '文件'))
+                file_addr = maindir + '\\' + file
+                file_size = os.path.getsize(file_addr)
+                timestamp = os.path.getmtime(file_addr)
+                file_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(timestamp))
+                self.OutputText.insert('', 'end', values=(file_addr, file, '文件', formatSize(file_size), file_time))
 
         self.ConfirmButton = tk.Button(self.SelectFrame, font=('Arial', 15), text='确认', command = confirm)
         self.ConfirmButton.pack(side=tk.LEFT)
@@ -158,7 +191,7 @@ class SearchPage():
 
     def dir_select(self):
         self.DirSelectEntry.delete(0, 'end')
-        DefaultDir = '/home/danny/'
+        DefaultDir = 'C:\\'
         options = {}
         options['parent'] = self.page
         SelectedDir = tk.filedialog.askdirectory(title='选择文件', initialdir=(os.path.expanduser(DefaultDir)), **options)
@@ -239,6 +272,8 @@ class Md5Page():
         self.FileConfirm.config(state='normal')
         self.DirEntry.config(state='normal')
         self.DirConfirm.config(state='normal')
+        for child in self.OutputText.get_children():
+            self.OutputText.delete(child)
 
     def dir_overwatch(self):
         self.FileEntry.delete(0, 'end')
@@ -265,7 +300,7 @@ class Md5Page():
         for child in self.OutputText.get_children():
             self.OutputText.delete(child)
 
-        DefaultDir = '/home/danny'
+        DefaultDir = 'C:\\'
         SelectedFiles = tk.filedialog.askopenfilenames(initialdir=DefaultDir, title="选择文件", filetypes=(("all files", "*.*"), ("all files", "*.*")))
         for SelectedFile in SelectedFiles:
             self.FileEntry.insert(0, SelectedFile + ' ')
@@ -296,7 +331,7 @@ class Md5Page():
         self.DirConfirm.config(state='normal')
         self.dir_overwatch()
         self.DirEntry.delete(0, 'end')
-        DefaultDir = '/home/danny/'
+        DefaultDir = 'C:\\'
         options = {}
         options['parent'] = self.page
         SelectedDir = tk.filedialog.askdirectory(title='选择路径', initialdir=(os.path.expanduser(DefaultDir)), **options)
@@ -325,8 +360,8 @@ class Md5Page():
         maindir, subdirs, files = walk(dirname)
 
         for file in files:
-            file_addr = maindir + '/' + file
-            self.OutputText.insert('', 'end', values=(file, self.getmd5(file_addr), maindir + '/' + file))
+            file_addr = maindir + '\\' + file
+            self.OutputText.insert('', 'end', values=(file, self.getmd5(file_addr), file_addr))
 
     def text_save(self):
         f = tkinter.filedialog.asksaveasfile(title = '选择保存路径', mode='w', filetypes=(("text files", "*.txt"), ("all files", "*.*")))
@@ -394,7 +429,7 @@ class Md5Page():
 
         self.page.mainloop()
 
-'''class ComparePage():
+class ComparePage():
     def __init__(self, title):
         self.page = tk.Toplevel()
         ws = self.page.winfo_screenwidth()
@@ -403,14 +438,119 @@ class Md5Page():
         y = (hs / 2) - (1080 / 2)
         self.page.geometry('%dx%d+%d+%d' % (1920, 1080, x, y))
         self.page.title(title)
-
+        self.Files = []
     def ret(self):
         self.page.destroy()
         mp = MainPage.mainpage(self)
-        mp.create()'''
+        mp.create()
+
+    def file_select(self):
+        self.SelectEntry.delete(0, 'end')
+        DefaultDir = 'C:\\'
+        SelectedFiles = tk.filedialog.askopenfilenames(initialdir=DefaultDir, title="选择文件",
+                                                       filetypes=(("all files", "*.*"), ("all files", "*.*")))
+        for SelectedFile in SelectedFiles:
+            self.SelectEntry.insert(0, SelectedFile + ' ')
+        self.Files = SelectedFiles
+
+    def getmd5(self, file_addr):
+        with open(file_addr, "rb") as f:
+            md5 = hashlib.md5()
+            md5.update(f.read())
+            hash = md5.hexdigest()
+            return hash
+
+    def add(self):
+        files_addr = self.SelectEntry.get()
+        self.SelectEntry.delete(0, 'end')
+        if (not files_addr):
+            tkinter.messagebox.showwarning(title='警告', message='请选择文件')
+            return
+
+        def formatSize(bytes):
+            try:
+                bytes = float(bytes)
+                kb = bytes / 1024
+            except:
+                print("传入的字节格式不对")
+                return "Error"
+
+            if kb >= 1024:
+                M = round(kb / 1024, 3)
+                if M >= 1024:
+                    G = round(M / 1024, 3)
+                    return "%.3fG" % (G)
+                else:
+                    return "%.3fM" % (M)
+            else:
+                kb = round(kb, 3)
+                return "%.3fkb" % (kb)
+
+        for file_addr in self.Files:
+            file = os.path.basename(file_addr)
+            timestamp = os.path.getmtime(file_addr)
+            file_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(timestamp))
+            file_size = os.path.getsize(file_addr)
+            self.OutputText.insert('', 'end', values=(file_addr, file, self.getmd5(file_addr), file_time, formatSize(file_size)))
+
+    def reset(self):
+        self.SelectEntry.delete(0, 'end')
+        for child in self.OutputText.get_children():
+            self.OutputText.delete(child)
+
+    def delete(self):
+        for line in self.OutputText.get_children():
+             print(self.OutputText.item(line)['values'][1])
+        child = self.OutputText.get_children()
+        size = len(child)
+        if(size > 0):
+            self.OutputText.delete(child[size-1])
+        else:
+            tkinter.messagebox.showwarning(title = '警告', message = '列表为空')
+            return
 
 
+    def create(self):
+        self.OutputFrame = tk.Frame(self.page)
+        self.OutputFrame.pack(expand='yes', fill='both')
+        self.OutputText = tk.ttk.Treeview(self.OutputFrame)
+        self.OutputText.pack(expand='yes', fill='both')
+        self.OutputText['show'] = 'headings'
 
+        self.OutputText['columns'] = ('路径', '文件名', 'Md5', '修改时间', '大小')
+        self.OutputText.column('路径', width=250)
+        self.OutputText.column('文件名', width=150)
+        self.OutputText.column('Md5', width=100)
+        self.OutputText.column('修改时间', width=100)
+        self.OutputText.column('大小', width=50)
+
+        self.OutputText.heading('路径', text='路径')
+        self.OutputText.heading('文件名', text='文件名')
+        self.OutputText.heading('Md5', text='Md5')
+        self.OutputText.heading('修改时间', text='修改时间')
+        self.OutputText.heading('大小', text='大小')
+
+        self.MenuFrame = tk.Frame(self.page)
+        self.MenuFrame.pack(side = tk.BOTTOM)
+        self.SelectFrame = tk.Frame(self.MenuFrame)
+        self.SelectFrame.pack(side = tk.TOP, fill = 'x')
+        self.OptionFrame = tk.Frame(self.MenuFrame)
+        self.OptionFrame.pack(side = tk.TOP, fill = 'x')
+
+        self.SelectLabel = tk.Label(self.SelectFrame, font = ('Arial', 15), text = '选择文件')
+        self.SelectLabel.pack(side = tk.LEFT, fill = 'x')
+        self.SelectEntry = tk.Entry(self.SelectFrame, show = None, font = ('Arial', 15))
+        self.SelectEntry.pack(side = tk.LEFT, fill = 'x')
+        self.SelectButton = tk.Button(self.SelectFrame, font = ('Arial', 15), text = '选择', command = self.file_select)
+        self.SelectButton.pack(side = tk.LEFT, fill = 'x')
+        self.AddButton = tk.Button(self.SelectFrame, font = ('Arial', 15), text = '增加', command = self.add)
+        self.AddButton.pack(side = tk.LEFT, fill = 'x')
+        self.ReturnButton = tk.Button(self.OptionFrame, font = ('Arial', 15), text = '返回', command = self.ret)
+        self.ReturnButton.pack(side = tk.LEFT, fill = 'x', expand = 'yes')
+        self.ResetButton = tk.Button(self.OptionFrame, font = ('Arial', 15), text = '置零', command = self.reset)
+        self.ResetButton.pack(side = tk.LEFT, fill = 'x', expand = 'yes')
+        self.DeleteButton = tk.Button(self.OptionFrame, font = ('Arial', 15), text = '删除', command = self.delete)
+        self.DeleteButton.pack(side = tk.LEFT, fill = 'x', expand = 'yes')
 
 class MainPage():
     def __init__(self, title):
@@ -438,6 +578,11 @@ class MainPage():
         md5page = Md5Page('Md5')
         md5page.create()
 
+    def compare(self):
+        self.page.withdraw()
+        comparepage = ComparePage('对比')
+        comparepage.create()
+
     def mainpage(self):
         mp = MainPage('test')
         return mp
@@ -455,8 +600,11 @@ class MainPage():
         self.MD5Button = tk.Button(self.MainFrame, font=('Arial', 16), text='MD5', width=20, command = self.md5)
         self.MD5Button.pack(side=tk.TOP)
 
-        self.CompareButton = tk.Button(self.MainFrame, font=('Arial', 16), text='对比', width=20)
+        self.CompareButton = tk.Button(self.MainFrame, font=('Arial', 16), text='对比', width=20, command = self.compare)
         self.CompareButton.pack(side = tk.TOP)
+
+        self.ExitButton = tk.Button(self.MainFrame, font=('Arial', 16), text='退出', width=20, command = self.page.quit)
+        self.ExitButton.pack(side = tk.TOP)
 
         self.page.mainloop()
 
