@@ -597,7 +597,7 @@ class MainPage():
         self.CompareButton = tk.Button(self.MainFrame, font=('Arial', 16), text='对比', width=20, command = self.compare)
         self.CompareButton.pack(side = tk.TOP)
 
-        self.ExitButton = tk.Button(self.MainFrame, font=('Arial', 16), text='退出', width=20, command = self.page.quit)
+        self.ExitButton = tk.Button(self.MainFrame, font=('Arial', 16), text='退出', width=20, command = self.page.destroy)
         self.ExitButton.pack(side = tk.TOP)
 
         self.page.mainloop()
